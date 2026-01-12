@@ -17,10 +17,11 @@ export default function Home() {
         mapInstanceRef.current = map
 
         map.on('click', async (e) => {
-            await supabase.from('report').insert({
+            await supabase.from('incidents').insert({
                 lat: e.lngLat.lat,
                 lng: e.lngLat.lng,
-                animal: 'deer',
+                animal_type: 'deer',
+                incident_type: 'sighting'
             })
             alert('投稿しました')
         })
