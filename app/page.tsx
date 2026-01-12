@@ -1,49 +1,62 @@
 'use client'
 import { useEffect, useRef } from 'react'
-import maplibregl from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
 import { supabase } from '@/lib/supabase'
 
 export default function Home() {
   const mapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const map = new maplibregl.Map({
-      container: mapRef.current!,
-      style: 'https://gsi-cyberjapan.github.io/gsivectortile-mapbox-gl-js/std.json',
-      center: [138, 37],
-      zoom: 5,
-      maxBounds: [[122, 20], [154, 46]]
-    })
+    const loadMap = () => {
+      const map = new (window as any).google.maps.Map(mapRef.current!, {
+        center: { lat: 37, lng: 138 }, // 日本
+        zoom: 5,
+        restriction: {
+          latLngBounds: {
+            north: 46,
+            south: 20,
+            west: 122,
+            east: 154,
+          },
+          strictBounds: true,
+        },
+      })
 
-    // 既存データを読み込んでピン表示
-    const loadReports = async () => {
-      const { data } = await supabase.from('reports').select('*')
-      data?.forEach(r => {
-        new maplibregl.Marker({ color: 'red' })
-          .setLngLat([r.lng, r.lat])
-          .addTo(map)
+      // 既存データを読み込んでピン表示
+      const loadReports = async () => {
+        const { data } = await supabase.from('reports').select('*')
+        data?.forEach(r => {
+          new (window as any).google.maps.Marker({
+            position: { lat: r.lat, lng: r.lng },
+            map,
+          })
+        })
+      }
+
+      loadReports()
+
+      // クリックで投稿
+      map.addListener('click', async (e: any) => {
+        const { data } = await supabase.from('reports').insert({
+          lat: e.latLng.lat(),
+          lng: e.latLng.lng(),
+          animal: 'deer',
+        }).select().single()
+
+        if (data) {
+          new (window as any).google.maps.Marker({
+            position: { lat: data.lat, lng: data.lng },
+            map,
+          })
+        }
       })
     }
 
-    map.on('load', loadReports)
-
-    // クリックで投稿
-    map.on('click', async (e) => {
-      const { data } = await supabase.from('reports').insert({
-        lat: e.lngLat.lat,
-        lng: e.lngLat.lng,
-        animal: 'deer',
-      }).select().single()
-
-      if (data) {
-        new maplibregl.Marker({ color: 'red' })
-          .setLngLat([data.lng, data.lat])
-          .addTo(map)
-      }
-    })
-
-    return () => map.remove()
+    // Google Maps API読み込み
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+    script.async = true
+    script.onload = loadMap
+    document.head.appendChild(script)
   }, [])
 
   return <div ref={mapRef} style={{ width: '100vw', height: '100vh' }} />
